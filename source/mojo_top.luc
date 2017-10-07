@@ -1,0 +1,145 @@
+module mojo_top (
+    input clk,              // 50MHz clock
+    input rst_n,            // reset button (active low)
+    output led [8],         // 8 user controllable LEDs
+    output io_led [3][8],   // LEDs on IO Shield
+    output io_seg [8],      // 7-segment LEDs on IO Shield
+    output io_sel [4],      // Digit select on IO Shield
+    input io_button [5],    // 5 buttons on IO Shield
+    //input io_dip [3][8],    // DIP switches on IO Shield
+    input sum,
+    input carry,
+    output a,
+    output b,
+    output c
+      ) {
+  
+  sig rst;                  // reset signal
+  
+  .clk(clk) {
+    // The reset conditioner is used to synchronize the reset signal to the FPGA clock. This ensures the entire FPGA comes out of reset at the same time.
+    reset_conditioner reset_cond;
+    .rst(rst){
+    multi_seven_seg seg_display;
+    dff counter[30]; //counter used to cycle through different states      
+     //defining state machine states
+      fsm state = {IDLE,TEST1,TEST2,TEST3,TEST4,TEST5,TEST6,TEST7,TEST8,ERROR,END};
+      }
+        
+  }
+  const X = 27;//constant used to control time before transitioning to next state (increase value to increase delay between states)
+  testcase test;
+  always {
+    reset_cond.in = ~rst_n; // input raw inverted reset signal
+    rst = reset_cond.out;   // conditioned reset
+    led = 8h00;             // turn LEDs off
+    io_led = 3x{{8h00}};    // turn IO shield LEDs off
+    seg_display.values = {4d14, 4d0, 4d15, 4d10};    
+    test.values = 3b000;
+    io_seg = ~seg_display.seg;
+    io_sel = ~seg_display.sel;
+    a=test.aout;
+    b=test.bout;
+    c=test.cout;
+    
+    //finite state machine for test cases
+    case (state.q) {
+      state.IDLE:
+      counter.d = 0; //clock counter is 0 when in idle state
+        if (io_button[1] == 1){ //pressing "CENTER" button initiates transition to TEST states
+          state.d = state.TEST1; //transition to testing the testcircuit
+        }
+        
+      state.TEST1: // Test case 1: A=0,B=0,C=0
+      test.values = 3b000;
+      seg_display.values = {4d1, 4d0, 4d0, 4d0};
+      counter.d = counter.q+1; //continually increases clock counter until delay time is over
+        if (counter.q[X]==1&&sum==0&&carry==0){ //once counter reaches defined value, and output of carry and sum is equal to truth table value (CORRECT ANSWER)
+          counter.d = 0; //reset counter value to 0
+          state.d = state.TEST2; //move on to next test case
+        }else if (counter.q[X]==1&&(sum==1||carry==1)){ //once counter reaches defined value but output of carry or sum is not equal to truth table value (WRONG ANSWER)
+          state.d=state.ERROR;} //move to error state
+          
+      state.TEST2: // Test case 2: A=1,B=0,C=0
+      test.values = 3b001;
+      seg_display.values = {4d2, 4d0, 4d0, 4d1};
+      counter.d = counter.q+1; //continually increases clock counter until delay time is over
+        if (counter.q[X]==1&&sum==1&&carry==0){ //once counter reaches defined value, and output of carry and sum is equal to truth table value (CORRECT ANSWER)
+          counter.d = 0; //reset counter value to 0
+          state.d = state.TEST3; //move on to next test case
+        }else if (counter.q[X]==1&&(sum==0||carry==1)){ //once counter reaches defined value but output of carry or sum is not equal to truth table value (WRONG ANSWER)
+          state.d=state.ERROR;} //move to error state
+          
+      state.TEST3: // Test case 3: A=0,B=1,C=0
+      test.values = 3b010;
+      seg_display.values = {4d3, 4d0, 4d1, 4d0};
+      counter.d = counter.q+1; //continually increases clock counter until delay time is over
+        if (counter.q[X]==1&&sum==1&&carry==0){ //once counter reaches defined value, and output of carry and sum is equal to truth table value (CORRECT ANSWER)
+          counter.d = 0; //reset counter value to 0
+          state.d = state.TEST4; //move on to next test case
+        }else if (counter.q[X] == 1&&(sum==0||carry==1)){ //once counter reaches defined value but output of carry or sum is not equal to truth table value (WRONG ANSWER)
+          state.d=state.ERROR;} //move to error state
+          
+      state.TEST4: // Test case 4: A=1,B=1,C=0
+      test.values = 3b011;
+      seg_display.values = {4d4, 4d0, 4d1, 4d1};
+      counter.d = counter.q+1; //continually increases clock counter until delay time is over
+        if (counter.q[X]==1&&sum==0&&carry==1){ //once counter reaches defined value, and output of carry and sum is equal to truth table value (CORRECT ANSWER)
+          counter.d = 0; //reset counter value to 0
+          state.d = state.TEST5; //move on to next test case
+        }else if (counter.q[X] == 1&&(sum==1||carry==0)){ //once counter reaches defined value but output of carry or sum is not equal to truth table value (WRONG ANSWER)
+          state.d=state.ERROR;} //move to error state
+          
+      state.TEST5: // Test case 5: A=0,B=0,C=1
+      test.values = 3b100;
+      seg_display.values = {4d5, 4d1, 4d0, 4d0};
+      counter.d = counter.q+1; //continually increases clock counter until delay time is over
+        if (counter.q[X]==1&&sum==1&&carry==0){ //once counter reaches defined value, and output of carry and sum is equal to truth table value (CORRECT ANSWER)
+          counter.d = 0; //reset counter value to 0
+          state.d = state.TEST6; //move on to next test case
+        }else if (counter.q[X] == 1&&(sum==0||carry==1)){ //once counter reaches defined value but output of carry or sum is not equal to truth table value (WRONG ANSWER)
+          state.d=state.ERROR;} //move to error state
+          
+      state.TEST6: // Test case 6: A=1,B=0,C=1
+      test.values = 3b101;
+      seg_display.values = {4d6, 4d1, 4d0, 4d1};
+      counter.d = counter.q+1; //continually increases clock counter until delay time is over
+        if (counter.q[X]==1&&sum==0&&carry==1){ //once counter reaches defined value, and output of carry and sum is equal to truth table value (CORRECT ANSWER)
+          counter.d = 0; //reset counter value to 0
+          state.d = state.TEST7; //move on to next test case
+        }else if (counter.q[X] == 1&&(sum==1||carry==0)){ //once counter reaches defined value but output of carry or sum is not equal to truth table value (WRONG ANSWER)
+          state.d=state.ERROR;} //move to error state
+          
+      state.TEST7: // Test case 7: A=0,B=1,C=1
+      test.values = 3b110;
+      seg_display.values = {4d7, 4d1, 4d1, 4d0};
+      counter.d = counter.q+1; //continually increases clock counter until delay time is over
+        if (counter.q[X]==1&&sum==0&&carry==1){ //once counter reaches defined value, and output of carry and sum is equal to truth table value (CORRECT ANSWER)
+          counter.d = 0; //reset counter value to 0
+          state.d = state.TEST8; //move on to next test case
+        }else if (counter.q[X] == 1&&(sum==1||carry==0)){ //once counter reaches defined value but output of carry or sum is not equal to truth table value (WRONG ANSWER)
+          state.d=state.ERROR;} //move to error state
+          
+      state.TEST8: // Test case 8: A=1,B=1,C=1
+      test.values = 3b111;
+      seg_display.values = {4d8, 4d1, 4d1, 4d1};
+      counter.d = counter.q+1; //continually increases clock counter until delay time is over
+        if (counter.q[X]==1&&sum==1&&carry==1){ //once counter reaches defined value, and output of carry and sum is equal to truth table value (CORRECT ANSWER)
+          counter.d = 0; //reset counter value to 0
+          state.d = state.END; //move on to next test case
+        }else if (counter.q[X] == 1&&(sum==0||carry==0)){ //once counter reaches defined value but output of carry or sum is not equal to truth table value (WRONG ANSWER)
+          state.d=state.ERROR;} //move to error state
+          
+      state.ERROR:
+      seg_display.values = {4d10, 4d12, 4d12, 4d11};
+      if (io_button[1] == 1){
+        state.d = state.IDLE;} //return to IDLE
+          
+      state.END: //DONE WITH TEST
+      seg_display.values = {4d00, 4d00, 4d13, 4d10};
+        if (io_button[1] == 1){
+          counter.d = 0;
+          state.d = state.IDLE;} //return to IDLE
+      }              
+    }
+  }

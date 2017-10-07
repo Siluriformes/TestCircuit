@@ -1,0 +1,28 @@
+module testcase (
+    input values[3],
+    output aout,
+    output bout,
+    output cout,
+    output abc[3]
+  ) {
+
+  always {
+    abc = values;
+    case (values[0]) {
+      0: aout = 0;
+      1: aout = 1;
+      default: aout = 0;
+    }
+    case (values[1]) {
+      0: bout = 0;
+      1: bout = 1;
+      default: bout = 0;
+    }
+    case (values[2]) {
+      0: cout = 0;
+      1: cout = 1;
+      default: cout = 0;
+    }
+}
+}
+
